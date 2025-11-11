@@ -1,0 +1,437 @@
+
+
+# ==========================================
+# 🎥 HYBRID MOVIE RECOMMENDATION SYSTEM
+# Using RS-A2_A3_Filtered_Ratings.csv
+# ==========================================
+
+import pandas as pd
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import linear_kernel, pairwise_distances
+from scipy.sparse import csr_matrix
+from sklearn.decomposition import TruncatedSVD
+
+# ----------------------------
+# Step 1: Load Data
+# ----------------------------
+def load_data():
+    file_path = "RS-A2_A3_Filtered_Ratings.csv"
+    ratings_df = pd.read_csv(file_path)
+
+    # Create dummy movie dataset with movieId, title, and genres
+    unique_movies = ratings_df['movieId'].unique()[:10]  # take first 10 for simplicity
+    movies_data = {
+        'movieId': unique_movies,
+        'title': [
+            f"Movie {i}" for i in range(1, len(unique_movies) + 1)
+        ],
+        'genres': [
+            'Action, Adventure', 'Drama', 'Comedy', 'Thriller', 'Sci-Fi',
+            'Horror', 'Romance', 'Crime', 'Fantasy', 'Animation'
+        ][:len(unique_movies)]
+    }
+    movies_df = pd.DataFrame(movies_data)
+
+    return movies_df, ratings_df
+
+# ----------------------------
+# Step 2: Preprocess (Content-Based)
+# ----------------------------
+def preprocess_content_based(movies_df):
+    movies_df['content'] = movies_df['genres']
+    tfidf = TfidfVectorizer(stop_words='english')
+    tfidf_matrix = tfidf.fit_transform(movies_df['content'])
+    cosine_sim = linear_kernel(tfidf_matrix, tfidf_matrix)
+    return cosine_sim
+
+# ----------------------------
+# Step 3: Preprocess (Collaborative)
+# ----------------------------
+def preprocess_collaborative(ratings_df, movies_df):
+    merged_df = pd.merge(ratings_df, movies_df, on='movieId')
+    user_item_matrix = merged_df.pivot(index='userId', columns='title', values='rating').fillna(0)
+    user_item_sparse = csr_matrix(user_item_matrix.values)
+    svd = TruncatedSVD(n_components=2)
+    latent_matrix = svd.fit_transform(user_item_sparse)
+    return latent_matrix, user_item_matrix
+
+# ----------------------------
+# Step 4: Recommendation Functions
+# ----------------------------
+def get_content_based_recommendations(title, movies_df, cosine_sim, top_n=3):
+    if title not in movies_df['title'].values:
+        print(f"Movie '{title}' not found in dataset.")
+        return []
+    idx = movies_df.index[movies_df['title'] == title][0]
+    sim_scores = list(enumerate(cosine_sim[idx]))
+    sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
+    sim_scores = sim_scores[1:top_n+1]
+    return [movies_df['title'].iloc[i[0]] for i in sim_scores]
+
+def get_collaborative_recommendations(user_id, ratings_df, latent_matrix, user_item_matrix, top_n=3):
+    if user_id not in user_item_matrix.index:
+        print(f"User ID {user_id} not found.")
+        return []
+    user_idx = user_item_matrix.index.get_loc(user_id)
+    distances = pairwise_distances(latent_matrix[user_idx].reshape(1, -1), latent_matrix, metric='cosine')[0]
+    similar_users = distances.argsort()[1:top_n+1]
+    recommended_movies = []
+    for idx in similar_users:
+        uid = user_item_matrix.index[idx]
+        movies = ratings_df[ratings_df['userId'] == uid]['movieId'].tolist()
+        recommended_movies.extend(movies)
+    return list(set(recommended_movies))
+
+def hybrid_recommendations(user_id, movie_title, movies_df, ratings_df, cosine_sim, latent_matrix, user_item_matrix):
+    content_recs = get_content_based_recommendations(movie_title, movies_df, cosine_sim)
+    collab_recs = get_collaborative_recommendations(user_id, ratings_df, latent_matrix, user_item_matrix)
+    combined = list(set(content_recs + [f"Movie ID {m}" for m in collab_recs]))
+    return combined
+
+# ----------------------------
+# Step 5: Main Menu
+# ----------------------------
+def main_menu():
+    movies_df, ratings_df = None, None
+    cosine_sim = None
+    latent_matrix, user_item_matrix = None, None
+
+    while True:
+        print("\n🎥 Movie Recommendation System")
+        print("1. Load Dataset")
+        print("2. Preprocess and Compute Similarity")
+        print("3. Get Movie Recommendations")
+        print("4. Exit")
+
+        choice = input("Enter choice (1-4): ")
+
+        if choice == '1':
+            movies_df, ratings_df = load_data()
+            print("✅ Dataset loaded successfully!")
+            print(f"Movies available: {list(movies_df['title'])}")
+            print(f"Users available: {ratings_df['userId'].unique()[:5]} ...")
+
+        elif choice == '2':
+            if movies_df is None or ratings_df is None:
+                print("Please load dataset first.")
+                continue
+            cosine_sim = preprocess_content_based(movies_df)
+            latent_matrix, user_item_matrix = preprocess_collaborative(ratings_df, movies_df)
+            print("✅ Data preprocessed and similarity computed successfully.")
+
+        elif choice == '3':
+            if cosine_sim is None or latent_matrix is None:
+                print("Please preprocess data first (option 2).")
+                continue
+            try:
+                user_id = int(input("Enter user ID: "))
+                movie_title = input("Enter movie title (e.g., Movie 1): ")
+                recs = hybrid_recommendations(user_id, movie_title, movies_df, ratings_df, cosine_sim, latent_matrix, user_item_matrix)
+                print(f"\n🎬 Hybrid Recommendations for user {user_id} and movie '{movie_title}':")
+                for r in recs:
+                    print(f" - {r}")
+            except Exception as e:
+                print(f"Error: {e}")
+
+        elif choice == '4':
+            print("👋 Goodbye!")
+            break
+
+        else:
+            print("Invalid choice. Please select 1-4.")
+
+# ----------------------------
+# Step 6: Run the Program
+# ----------------------------
+if __name__ == "__main__":
+    main_menu()
+
+
+
+
+
+
+output :
+
+🎥 Movie Recommendation System
+
+1. Load Dataset
+2. Preprocess and Compute Similarity
+3. Get Movie Recommendations
+4. Exit
+Enter choice (1-4): 1
+✅ Dataset loaded successfully!
+Movies available: ['Movie 1', 'Movie 2', 'Movie 3', 'Movie 4', 'Movie 5', 'Movie 6', 'Movie 7', 'Movie 8', 'Movie 9', 'Movie 10']
+Users available: [ 28507 131160  85252  20821 134445] ...
+
+🎥 Movie Recommendation System
+1. Load Dataset
+2. Preprocess and Compute Similarity
+3. Get Movie Recommendations
+4. Exit
+Enter choice (1-4): 2
+✅ Data preprocessed and similarity computed successfully.
+
+🎥 Movie Recommendation System
+1. Load Dataset
+2. Preprocess and Compute Similarity
+3. Get Movie Recommendations
+4. Exit
+Enter choice (1-4): 3
+Enter user ID: 85252
+Enter movie title (e.g., Movie 1): 36
+Movie '36' not found in dataset.
+
+🎬 Hybrid Recommendations for user 85252 and movie '36':
+ - Movie ID 356
+ - Movie ID 316
+ - Movie ID 364
+ - Movie ID 337
+ - Movie ID 454
+ - Movie ID 19
+ - Movie ID 318
+ - Movie ID 346
+ - Movie ID 17
+ - Movie ID 349
+ - Movie ID 34
+ - Movie ID 232
+ - Movie ID 44
+ - Movie ID 376
+ - Movie ID 480
+ - Movie ID 293
+ - Movie ID 23
+ - Movie ID 344
+ - Movie ID 555
+ - Movie ID 300
+ - Movie ID 235
+ - Movie ID 168
+ - Movie ID 196
+ - Movie ID 11
+ - Movie ID 110
+ - Movie ID 216
+ - Movie ID 307
+ - Movie ID 165
+ - Movie ID 177
+ - Movie ID 534
+ - Movie ID 592
+ - Movie ID 357
+ - Movie ID 36
+ - Movie ID 380
+ - Movie ID 338
+ - Movie ID 595
+ - Movie ID 163
+ - Movie ID 339
+ - Movie ID 440
+ - Movie ID 475
+ - Movie ID 441
+ - Movie ID 151
+ - Movie ID 1
+ - Movie ID 426
+ - Movie ID 10
+ - Movie ID 452
+ - Movie ID 521
+ - Movie ID 348
+ - Movie ID 305
+ - Movie ID 588
+ - Movie ID 314
+ - Movie ID 539
+ - Movie ID 173
+ - Movie ID 371
+ - Movie ID 150
+ - Movie ID 161
+ - Movie ID 501
+ - Movie ID 265
+ - Movie ID 296
+ - Movie ID 52
+ - Movie ID 444
+ - Movie ID 160
+ - Movie ID 253
+ - Movie ID 47
+ - Movie ID 45
+ - Movie ID 39
+ - Movie ID 553
+ - Movie ID 215
+ - Movie ID 266
+ - Movie ID 509
+ - Movie ID 538
+ - Movie ID 434
+ - Movie ID 185
+ - Movie ID 48
+ - Movie ID 246
+ - Movie ID 431
+ - Movie ID 537
+ - Movie ID 292
+ - Movie ID 21
+ - Movie ID 231
+ - Movie ID 32
+ - Movie ID 306
+ - Movie ID 172
+ - Movie ID 315
+ - Movie ID 329
+ - Movie ID 351
+ - Movie ID 342
+ - Movie ID 58
+ - Movie ID 498
+ - Movie ID 535
+ - Movie ID 50
+ - Movie ID 224
+ - Movie ID 281
+ - Movie ID 28
+ - Movie ID 261
+ - Movie ID 288
+ - Movie ID 590
+ - Movie ID 308
+ - Movie ID 457
+ - Movie ID 515
+ - Movie ID 420
+ - Movie ID 352
+ - Movie ID 410
+
+🎥 Movie Recommendation System
+1. Load Dataset
+2. Preprocess and Compute Similarity
+3. Get Movie Recommendations
+4. Exit
+Enter choice (1-4): 4
+👋 Goodbye!
+
+
+
+
+
+Assignment No-3
+
+Title-Develop a hybrid recommender system for movie rating applications
+Objectives-
+● To understand the principles of hybrid recommendation systems combining content-
+based and collaborative filtering techniques.
+● To implement a functional hybrid recommender system using a movie dataset.
+● To evaluate the effectiveness of the system in providing relevant movie
+recommendations.
+Outcomes-Students will be able to
+● Understand and apply the principles of recommendation systems using Python and
+relevant libraries.
+● Effectively clean, preprocess, and analyze data for user-item matrices.
+● Implement similarity calculations and matrix factorization algorithms while defining and
+interpreting evaluation metrics.
+● Design and integrate a hybrid recommendation system, analyzing its impact on user
+experience.
+● Document work, collaborate in teams, and recognize ethical considerations in
+recommendation systems.
+
+Theory-
+Developing a hybrid recommender system for movie rating applications combines multiple
+recommendation techniques to provide more accurate and diverse suggestions. A common
+approach is to integrate content-based filtering and collaborative filtering.
+Components of a Hybrid Recommender System
+1. Content-Based Filtering: This method recommends items similar to those a user has
+liked in the past based on their features (e.g., genre, description).
+2. Collaborative Filtering: This method recommends items based on the preferences and
+behaviors of similar users. It can be user-based (finding users with similar tastes) or
+item-based (finding items that are liked by users who liked the same items).
+3. Blending: A hybrid system can combine the outputs of both approaches to generate final
+recommendations. This can be done using various methods, such as weighted average,
+switching, or stacking.
+Steps to Build a Hybrid Recommender System
+Step 1: Load the Dataset
+
+You can use datasets like MovieLens or your own dataset that includes user ratings, movie
+titles, genres, and descriptions.
+Step 2: Preprocess the Data
+● Clean and format the data.
+● Handle missing values if any.
+Step 3: Implement Content-Based Filtering
+● Extract features using TF-IDF or similar techniques.
+● Calculate similarity scores.
+Step 4: Implement Collaborative Filtering
+● Use techniques like matrix factorization (e.g., SVD, NMF) or k-nearest neighbors.
+Step 5: Combine the Recommendations
+● Use a blending technique to combine results from both approaches.
+Sample code-
+import pandas as pd
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import linear_kernel
+from sklearn.metrics import pairwise_distances
+from scipy.sparse import csr_matrix
+from sklearn.decomposition import TruncatedSVD
+# Step 1: Load Dataset
+# Sample movie dataset
+movies_data = {
+&#39;title&#39;: [
+&#39;The Shawshank Redemption&#39;,
+&#39;The Godfather&#39;,
+&#39;The Dark Knight&#39;,
+&#39;Pulp Fiction&#39;,
+&#39;The Lord of the Rings: The Return of the King&#39;
+],
+&#39;genres&#39;: [
+&#39;Drama&#39;,
+&#39;Crime, Drama&#39;,
+&#39;Action, Crime, Drama&#39;,
+&#39;Crime, Drama&#39;,
+&#39;Action, Adventure, Fantasy&#39;
+],
+
+&#39;description&#39;: [
+&#39;Two imprisoned men bond over years, finding solace through common decency.&#39;,
+&#39;The aging patriarch of an organized crime dynasty transfers control to his son.&#39;,
+&#39;When the Joker emerges, he wreaks havoc on Gotham.&#39;,
+&#39;The lives of two mob hitmen and others intertwine in tales of violence.&#39;,
+&#39;Gandalf and Aragorn lead the World of Men against Sauron.&#39;
+]
+}
+movies_df = pd.DataFrame(movies_data)
+# Sample user ratings (user_id, movie_id, rating)
+ratings_data = {
+&#39;user_id&#39;: [1, 1, 1, 2, 2, 3, 3],
+&#39;title&#39;: [&#39;The Shawshank Redemption&#39;, &#39;The Godfather&#39;, &#39;The Dark Knight&#39;,
+&#39;The Dark Knight&#39;, &#39;Pulp Fiction&#39;, &#39;The Shawshank Redemption&#39;, &#39;Pulp Fiction&#39;],
+&#39;rating&#39;: [5, 4, 5, 4, 5, 5, 4]
+}
+ratings_df = pd.DataFrame(ratings_data)
+# Step 2: Preprocess Data for Content-Based Filtering
+# Combine genres and description into a single string
+movies_df[&#39;content&#39;] = movies_df[&#39;genres&#39;] + &#39; &#39; + movies_df[&#39;description&#39;]
+tfidf = TfidfVectorizer(stop_words=&#39;english&#39;)
+tfidf_matrix = tfidf.fit_transform(movies_df[&#39;content&#39;])
+# Compute cosine similarity for content-based filtering
+cosine_sim = linear_kernel(tfidf_matrix, tfidf_matrix)
+# Step 3: Implement Collaborative Filtering
+# Create a user-item matrix
+user_item_matrix = ratings_df.pivot(index=&#39;user_id&#39;, columns=&#39;title&#39;, values=&#39;rating&#39;).fillna(0)
+user_item_sparse = csr_matrix(user_item_matrix.values)
+# Apply SVD for dimensionality reduction
+svd = TruncatedSVD(n_components=2)
+latent_matrix = svd.fit_transform(user_item_sparse)
+# Step 4: Generate Recommendations
+def get_content_based_recommendations(title, cosine_sim=cosine_sim):
+idx = movies_df.index[movies_df[&#39;title&#39;] == title][0]
+sim_scores = list(enumerate(cosine_sim[idx]))
+sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
+
+return [movies_df[&#39;title&#39;].iloc[i[0]] for i in sim_scores[1:4]]
+def get_collaborative_recommendations(user_id):
+user_idx = ratings_df[&#39;user_id&#39;].unique().tolist().index(user_id)
+similar_users = pairwise_distances(latent_matrix[user_idx].reshape(1, -1), latent_matrix,
+metric=&#39;cosine&#39;)[0]
+similar_users_indices = similar_users.argsort()[:3]
+recommended_movies = []
+for idx in similar_users_indices:
+recommended_movies.extend(ratings_df[ratings_df[&#39;user_id&#39;] ==
+ratings_df[&#39;user_id&#39;].unique()[idx]][&#39;title&#39;].tolist())
+return list(set(recommended_movies))
+# Step 5: Combine Recommendations
+def hybrid_recommendations(user_id, title):
+content_based = get_content_based_recommendations(title)
+collaborative_based = get_collaborative_recommendations(user_id)
+combined = list(set(content_based + collaborative_based))
+return combined
+# Example Usage
+user_id = 1
+movie_title = &#39;The Godfather&#39;
+recommended_movies = hybrid_recommendations(user_id, movie_title)
+print(&quot;Hybrid Recommendations for user {} and movie &#39;{}&#39;:&quot;.format(user_id, movie_title))
+print(recommended_movies)
+Output-
+Hybrid Recommendations for user 1 and movie &#39;The Godfather&#39;:
+[&#39;The Shawshank Redemption&#39;, &#39;Pulp Fiction&#39;, &#39;The Dark Knight&#39;]

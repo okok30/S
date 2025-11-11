@@ -1,0 +1,339 @@
+# ============================================================
+#  ASSIGNMENT 5
+# Title: Develop Advanced Recommendation System for E-commerce (Movie Ratings)
+# Algorithm: Optimized Matrix Factorization using SVD
+# ============================================================
+
+import numpy as np
+import pandas as pd
+from scipy.sparse.linalg import svds
+from sklearn.metrics import mean_squared_error
+from math import sqrt
+
+# ------------------------------------------------------------
+# Step 1: Load Dataset
+# ------------------------------------------------------------
+def load_real_data():
+    """
+    Load the real movie rating dataset (Filtered Ratings CSV)
+    Columns: userId, movieId, rating
+    """
+    file_path = "RS-A2_A3_Filtered_Ratings.csv"
+    df = pd.read_csv(file_path)
+
+    print(" Dataset loaded successfully!\n")
+    print("Columns available:\n", df.columns.tolist(), "\n")
+    print(df.head())
+
+    df = df[['userId', 'movieId', 'rating']].dropna()
+
+    # Reduce dataset size if it's huge (optional safety)
+    if len(df) > 200000:
+        df = df.sample(200000, random_state=42)
+
+    df['userId'] = df['userId'].astype(int)
+    df['movieId'] = df['movieId'].astype(int)
+    df['rating'] = df['rating'].astype(float)
+
+    return df
+
+# ------------------------------------------------------------
+# Step 2: Create User-Item Matrix
+# ------------------------------------------------------------
+def create_user_item_matrix(df):
+    user_item = df.pivot_table(index='userId', columns='movieId', values='rating')
+    print("\nUser-Item Interaction Matrix (sample):")
+    print(user_item.head())
+    return user_item
+
+# ------------------------------------------------------------
+# Step 3: Train SVD-based Matrix Factorization
+# ------------------------------------------------------------
+def train_svd(user_item_matrix, k=10):
+    """
+    Perform memory-optimized SVD using sparse representation.
+    """
+    matrix_filled = user_item_matrix.fillna(0).values
+    user_ratings_mean = np.mean(matrix_filled, axis=1)
+    matrix_demeaned = matrix_filled - user_ratings_mean.reshape(-1, 1)
+
+    # Perform truncated SVD (low-rank approximation)
+    U, sigma, Vt = svds(matrix_demeaned, k=k)
+    sigma = np.diag(sigma)
+
+    all_user_predicted_ratings = np.dot(np.dot(U, sigma), Vt) + user_ratings_mean.reshape(-1, 1)
+    preds_df = pd.DataFrame(all_user_predicted_ratings,
+                            index=user_item_matrix.index,
+                            columns=user_item_matrix.columns)
+    return preds_df
+
+# ------------------------------------------------------------
+# Step 4: Evaluate Model
+# ------------------------------------------------------------
+def evaluate_model(preds_df, original_df):
+    y_true = []
+    y_pred = []
+
+    # Only evaluate on known ratings
+    for _, row in original_df.iterrows():
+        user = row['userId']
+        item = row['movieId']
+        actual = row['rating']
+        try:
+            predicted = preds_df.loc[user, item]
+            y_true.append(actual)
+            y_pred.append(predicted)
+        except KeyError:
+            continue
+
+    rmse = sqrt(mean_squared_error(y_true, y_pred))
+    print(f"\n Root Mean Squared Error (RMSE) on known ratings: {rmse:.4f}")
+
+# ------------------------------------------------------------
+# Step 5: Recommend Items
+# ------------------------------------------------------------
+def recommend_items(preds_df, user_id, original_df, num_recommendations=5):
+    user_row = preds_df.loc[user_id]
+    rated_items = original_df[original_df['userId'] == user_id]['movieId'].tolist()
+    recommendations = user_row.drop(labels=rated_items, errors='ignore').sort_values(ascending=False).head(num_recommendations)
+    return recommendations
+
+# ------------------------------------------------------------
+# Step 6: Main Program
+# ------------------------------------------------------------
+def main():
+    print(" Loading movie ratings dataset...")
+    df = load_real_data()
+
+    user_item_matrix = create_user_item_matrix(df)
+    print("\n🔧 Training Matrix Factorization model using SVD (optimized)...")
+    preds_df = train_svd(user_item_matrix, k=10)  # reduced k for less memory
+
+    print("\n Predicted Ratings Matrix (sample):")
+    print(preds_df.round(2).head())
+
+    evaluate_model(preds_df, df)
+
+    while True:
+        try:
+            user_id = int(input("\nEnter a User ID to get recommendations (or 0 to exit): "))
+            if user_id == 0:
+                print(" Exiting Recommendation System.")
+                break
+            if user_id not in user_item_matrix.index:
+                print(" User ID not found. Try again.")
+                continue
+
+            recs = recommend_items(preds_df, user_id, df, num_recommendations=5)
+            print(f"\n Top Recommendations for User {user_id}:")
+            for movie, rating in recs.items():
+                print(f"Movie ID: {movie} | Predicted Rating: {rating:.2f}")
+        except ValueError:
+            print(" Invalid input. Please enter a valid integer User ID.")
+
+# ------------------------------------------------------------
+# Run the Program
+# ------------------------------------------------------------
+if __name__ == "__main__":
+    main()
+
+
+
+
+
+
+
+
+output
+
+🎬 Loading movie ratings dataset...
+✅ Dataset loaded successfully!
+
+Columns available:
+ ['Unnamed: 0', 'userId', 'movieId', 'rating', 'timestamp'] 
+
+   Unnamed: 0  userId  movieId  rating            timestamp
+0     4182421   28507     1176     4.0  1995-01-09 11:46:44
+1    18950979  131160     1079     3.0  1995-01-09 11:46:49
+2    18950936  131160       47     5.0  1995-01-09 11:46:49
+3    18950930  131160       21     3.0  1995-01-09 11:46:49
+4    12341178   85252       45     3.0  1996-01-29 00:00:00
+
+User-Item Interaction Matrix (sample):
+movieId  1     2     3     4     5     6     7     8     9     10    ...  \
+userId                                                               ...   
+751       NaN   NaN   NaN   NaN   NaN   NaN   NaN   NaN   NaN   2.0  ...   
+1540      NaN   NaN   NaN   NaN   NaN   NaN   NaN   NaN   NaN   5.0  ...   
+1947      NaN   NaN   NaN   NaN   NaN   NaN   NaN   NaN   NaN   NaN  ...   
+2043      NaN   NaN   NaN   NaN   NaN   4.0   NaN   NaN   NaN   3.0  ...   
+2229      NaN   NaN   NaN   NaN   NaN   NaN   NaN   NaN   NaN   NaN  ...   
+
+movieId  691   692   695   698   700   701   709   1079  1176  6918  
+userId                                                               
+751       NaN   NaN   NaN   NaN   NaN   NaN   NaN   NaN   NaN   NaN  
+1540      NaN   NaN   NaN   NaN   NaN   NaN   NaN   NaN   NaN   NaN  
+1947      NaN   NaN   NaN   NaN   NaN   NaN   NaN   NaN   NaN   NaN  
+2043      NaN   NaN   NaN   NaN   NaN   NaN   NaN   NaN   NaN   NaN  
+2229      NaN   NaN   NaN   NaN   NaN   NaN   NaN   NaN   NaN   NaN  
+
+[5 rows x 497 columns]
+
+🔧 Training Matrix Factorization model using SVD (optimized)...
+
+✅ Predicted Ratings Matrix (sample):
+movieId  1     2     3     4     5     6     7     8     9     10    ...  \
+userId                                                               ...   
+751      1.08  0.82  0.15  0.24  0.50  0.85  0.37  0.03  0.26  1.18  ...   
+1540     1.88  1.23  0.17  0.09  0.26  1.29  0.67  0.10  0.26  2.08  ...   
+1947    -0.28  1.21  0.29  0.62  1.27  0.11  0.99  0.24  0.33 -0.48  ...   
+2043     2.93  0.02  0.03  0.30  0.20  0.97  0.39 -0.01  0.31  2.27  ...   
+2229     1.44 -0.04  0.12  0.13 -0.40  1.16  0.25  0.06  0.12  1.05  ...   
+
+movieId  691   692   695   698   700   701   709   1079  1176  6918  
+userId                                                               
+751     -0.09 -0.09 -0.06 -0.05 -0.03 -0.06 -0.06 -0.06 -0.06 -0.08  
+1540     0.00  0.21  0.13  0.03 -0.03  0.05  0.04  0.06  0.06  0.04  
+1947     0.35  0.20  0.17  0.15  0.26  0.19  0.43  0.19  0.19  0.23  
+2043     0.06 -0.00 -0.09  0.07  0.08 -0.09 -0.10 -0.07 -0.07 -0.04  
+2229    -0.07  0.09  0.02  0.06  0.04 -0.02 -0.12 -0.00 -0.01 -0.04  
+
+[5 rows x 497 columns]
+
+📊 Root Mean Squared Error (RMSE) on known ratings: 2.3265
+
+Enter a User ID to get recommendations (or 0 to exit): 28507
+
+🎯 Top Recommendations for User 28507:
+Movie ID: 139 | Predicted Rating: 0.02
+Movie ID: 295 | Predicted Rating: 0.01
+Movie ID: 84 | Predicted Rating: 0.01
+Movie ID: 82 | Predicted Rating: 0.01
+Movie ID: 467 | Predicted Rating: 0.01
+
+Enter a User ID to get recommendations (or 0 to exit): 20821
+
+🎯 Top Recommendations for User 20821:
+Movie ID: 50 | Predicted Rating: 1.78
+Movie ID: 288 | Predicted Rating: 1.33
+Movie ID: 1 | Predicted Rating: 1.33
+Movie ID: 21 | Predicted Rating: 1.12
+Movie ID: 47 | Predicted Rating: 1.04
+
+
+
+
+
+
+
+
+
+
+Assignment No-5
+
+Title- Develop advanced recommendation systems for e-commerce using matrix factorization
+algorithm.
+Objectives-
+● The primary objective of this assignment is to design, implement, and evaluate an
+advanced recommendation system for an e-commerce platform using matrix factorization
+algorithms. The system should provide personalized product recommendations to users
+based on their interactions with products.
+
+
+Outcomes-
+● Understand the principles behind recommendation systems and matrix factorization
+techniques.
+● Implement a recommendation system using a matrix factorization algorithm (e.g., SVD).
+● Evaluate the performance of the recommendation system using appropriate metrics.
+● Analyze the results and understand how the system can be improved.
+● Present findings and recommendations based on the analysis.
+
+
+Theory-
+1. Introduction to Recommendation Systems
+Recommendation systems are essential tools in e-commerce platforms, designed to enhance user
+experience by providing personalized suggestions. These systems analyze user behavior and
+preferences to recommend products that are most likely to interest individual users. They can
+significantly increase user engagement, boost sales, and improve customer satisfaction.
+Types of Recommendation Systems:
+- Collaborative Filtering: Based on the idea that users with similar tastes will like similar items.
+This method uses historical interactions among users and items.
+- Content-Based Filtering: Recommends items similar to those a user has previously liked, based
+on item attributes (e.g., features, descriptions).
+- Hybrid Methods: Combine collaborative and content-based filtering to leverage the strengths of
+both approaches, providing more accurate and diverse recommendations.
+2. Matrix Factorization
+Matrix factorization is a powerful technique used in collaborative filtering. It works by
+decomposing the user-item interaction matrix into lower-dimensional matrices that represent
+latent features of users and items. These latent features help capture hidden patterns in user
+preferences.
+Key Concepts:
+- User-Item Interaction Matrix: This matrix (often sparse) represents interactions (e.g., ratings,
+purchases) between users and items. Rows correspond to users, columns correspond to items,
+and entries represent interactions.
+\[ R = \begin{bmatrix}
+r_{11} &amp; r_{12} &amp; \ldots &amp; r_{1n} \\
+r_{21} &amp; r_{22} &amp; \ldots &amp; r_{2n} \\
+
+\vdots &amp; \vdots &amp; \ddots &amp; \vdots \\
+r_{m1} &amp; r_{m2} &amp; \ldots &amp; r_{mn}
+\end{bmatrix}
+\]
+- Latent Factors: These are hidden features that explain observed ratings. For example, in a
+movie recommendation system, latent factors could represent genres, while in e-commerce, they
+could represent product categories or user preferences.
+- Decomposition: The interaction matrix \( R \) can be approximated by the product of two
+lower-dimensional matrices:
+\[
+R \approx U \times V^T
+\]
+where \( U \) is the user feature matrix and \( V \) is the item feature matrix.
+
+3. Popular Matrix Factorization Techniques
+- Singular Value Decomposition (SVD): A well-known technique that reduces dimensionality by
+factorizing the user-item matrix into three matrices: user features, singular values, and item
+features. SVD captures the most significant patterns in the data.
+- Alternating Least Squares (ALS): This method iteratively solves for user and item matrices by
+alternately fixing one and optimizing the other. ALS is particularly useful for large datasets and
+is effective in implicit feedback scenarios.
+- Non-negative Matrix Factorization (NMF): Decomposes the matrix into non-negative factors,
+making the results easier to interpret. This is beneficial in scenarios where negative values are
+not meaningful, such as counts or ratings.
+
+4. Model Training and Evaluation
+Training a matrix factorization model involves the following steps:
+1. Loss Function: The model&#39;s performance is typically measured using a loss function, such as
+Mean Squared Error (MSE):
+\[
+\text{Loss} = \sum_{(i,j) \in K} (r_{ij} - \hat{r}_{ij})^2
+\]
+where \( r_{ij} \) is the actual rating and \( \hat{r}_{ij} \) is the predicted rating. The sum runs
+over all known interactions \( K \).
+2. Regularization: To avoid overfitting, regularization techniques are applied to the loss function,
+penalizing large weights in the latent factor matrices.
+
+3. Gradient Descent: This optimization technique is often used to minimize the loss function,
+iteratively adjusting the latent factors based on the gradients.
+
+5. Recommendations and User Engagement
+Once trained, the model can predict missing ratings for items not yet interacted with by users.
+Recommendations can be generated by:
+- Predicting Scores: Calculate the predicted interaction scores for each user-item pair.
+- Top-N Recommendations: For each user, recommend the top-N items with the highest
+predicted scores.
+
+6. Challenges and Considerations
+- Cold Start Problem: New users or items lack sufficient data for making accurate
+recommendations. Solutions include using demographic data or recommending popular items.
+- Sparsity: User-item interaction matrices are often sparse, leading to challenges in training
+effective models. Techniques like incorporating side information (item features, user
+demographics) can help.
+- Scalability: As datasets grow, ensuring that the recommendation system remains efficient is
+crucial. Consider distributed systems or optimizations in the matrix factorization algorithms.
+Conclusion
+Understanding matrix factorization and its application in recommendation systems is crucial for
+developing effective e-commerce solutions. By leveraging latent factors, we can provide
+personalized recommendations that enhance user experience and drive sales. This assignment
+allows students to explore these concepts practically and equips them with the skills needed to
+implement advanced recommendation systems.
+Note-Add code and proper output printouts with write up.
+

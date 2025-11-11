@@ -1,0 +1,306 @@
+ASSI 1
+
+import numpy as np
+import pandas as pd
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from keras.models import Sequential
+from keras.layers import Conv2D, MaxPooling2D, Flatten, Dense
+
+# Step 1: Data Loading Function
+def load_yield_data(filepath):
+    df = pd.read_csv(filepath)
+    # Select relevant columns
+    df = df[['average_rain_fall_mm_per_year', 'pesticides_tonnes', 'avg_temp', 'hg/ha_yield']]
+    df = df.dropna()
+
+    X = df[['average_rain_fall_mm_per_year', 'pesticides_tonnes', 'avg_temp']]
+    y = df['hg/ha_yield']
+
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+    return X_scaled, y, scaler
+
+# Step 2: Image Data Generation (for CNN)
+def generate_image_data(num_images=100, img_shape=(64, 64, 3)):
+    X_images = np.random.rand(num_images, *img_shape)
+    y_labels = np.random.randint(2, size=num_images)
+    return X_images, y_labels
+
+# Step 3: CNN Model for Disease Detection
+def build_cnn_model(img_shape=(64, 64, 3)):
+    model = Sequential([
+        Conv2D(32, (3, 3), activation='relu', input_shape=img_shape),
+        MaxPooling2D(pool_size=(2, 2)),
+        Flatten(),
+        Dense(128, activation='relu'),
+        Dense(1, activation='sigmoid')
+    ])
+    model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+    return model
+
+# Step 4: Random Forest Model for Yield Prediction
+def build_rf_model(X_train, y_train):
+    model = RandomForestRegressor(n_estimators=100, random_state=42)
+    model.fit(X_train, y_train)
+    return model
+
+# Step 5: Recommendation Logic
+def recommend(disease_pred, yield_pred):
+    if disease_pred >= 0.5:
+        return "Disease detected! Recommended action: Apply pesticide."
+    elif yield_pred < 50000:
+        return "Low yield predicted! Recommended action: Improve irrigation and soil quality."
+    else:
+        return "Crop is healthy and yield prediction is optimal."
+
+# Step 6: Main Menu
+def main_menu():
+    cnn_model, rf_model = None, None
+    X_train_images, y_train_images = None, None
+    X_env, y_env, scaler = None, None, None
+
+    while True:
+        print("\nCrop Disease & Yield System - Menu")
+        print("1. Train Disease Detection Model (CNN)")
+        print("2. Train Yield Prediction Model (Random Forest using Dataset)")
+        print("3. Test Disease & Yield Prediction and get Recommendation")
+        print("4. Exit")
+        choice = input("Enter your choice (1-4): ")
+
+        if choice == '1':
+            X_train_images, y_train_images = generate_image_data()
+            cnn_model = build_cnn_model()
+            cnn_model.fit(X_train_images, y_train_images, epochs=5, batch_size=10, verbose=1)
+            print(" Disease Detection Model trained successfully.")
+
+        elif choice == '2':
+            # Using your specified dataset path
+            file_path = "RS-A1_yield.csv"
+            X_env, y_env, scaler = load_yield_data(file_path)
+            X_train, X_test, y_train, y_test = train_test_split(X_env, y_env, test_size=0.2, random_state=42)
+            rf_model = build_rf_model(X_train, y_train)
+            print(" Yield Prediction Model trained successfully using dataset.")
+
+        elif choice == '3':
+            if cnn_model is None or rf_model is None:
+                print(" Please train both models first!")
+                continue
+
+            # Random test image & environmental data
+            test_image = np.random.rand(1, 64, 64, 3)
+            disease_pred = cnn_model.predict(test_image, verbose=0)[0][0]
+
+            test_env_data = np.random.rand(1, 3)
+            test_env_scaled = (test_env_data - test_env_data.mean()) / test_env_data.std()
+            yield_pred = rf_model.predict(test_env_scaled)[0]
+
+            recommendation = recommend(disease_pred, yield_pred)
+
+            print(f"Disease Prediction: {disease_pred:.4f} (0: Healthy, 1: Diseased)")
+            print(f"Yield Prediction: {yield_pred:.2f} hg/ha")
+            print(f"Recommendation: {recommendation}")
+
+        elif choice == '4':
+            print(" Exiting program. Goodbye!")
+            break
+
+        else:
+            print(" Invalid input. Please select from 1-4.")
+
+# Run the system
+if __name__ == "__main__":
+    main_menu()
+
+
+
+
+
+output 
+
+
+
+Crop Disease & Yield System - Menu
+1. Train Disease Detection Model (CNN)
+2. Train Yield Prediction Model (Random Forest using Dataset)
+3. Test Disease & Yield Prediction and get Recommendation
+4. Exit
+Enter your choice (1-4): 1
+C:\Users\DELL\AppData\Roaming\Python\Python311\site-packages\keras\src\layers\convolutional\base_conv.py:107: UserWarning: Do not pass an `input_shape`/`input_dim` argument to a layer. When using Sequential models, prefer using an `Input(shape)` object as the first layer in the model instead.
+  super().__init__(activity_regularizer=activity_regularizer, **kwargs)
+Epoch 1/5
+10/10 ━━━━━━━━━━━━━━━━━━━━ 5s 116ms/step - accuracy: 0.5413 - loss: 4.0929
+Epoch 2/5
+10/10 ━━━━━━━━━━━━━━━━━━━━ 1s 134ms/step - accuracy: 0.5513 - loss: 1.6199
+Epoch 3/5
+10/10 ━━━━━━━━━━━━━━━━━━━━ 1s 113ms/step - accuracy: 0.3135 - loss: 0.8077
+Epoch 4/5
+10/10 ━━━━━━━━━━━━━━━━━━━━ 1s 109ms/step - accuracy: 0.6515 - loss: 0.6371
+Epoch 5/5
+10/10 ━━━━━━━━━━━━━━━━━━━━ 1s 88ms/step - accuracy: 0.7221 - loss: 0.5395
+ Disease Detection Model trained successfully.
+
+Crop Disease & Yield System - Menu
+1. Train Disease Detection Model (CNN)
+2. Train Yield Prediction Model (Random Forest using Dataset)
+3. Test Disease & Yield Prediction and get Recommendation
+4. Exit
+Enter your choice (1-4): 2
+ Yield Prediction Model trained successfully using dataset.
+
+Crop Disease & Yield System - Menu
+1. Train Disease Detection Model (CNN)
+2. Train Yield Prediction Model (Random Forest using Dataset)
+3. Test Disease & Yield Prediction and get Recommendation
+4. Exit
+Enter your choice (1-4): 3
+Disease Prediction: 0.6380 (0: Healthy, 1: Diseased)
+Yield Prediction: 73672.23 hg/ha
+Recommendation: Disease detected! Recommended action: Apply pesticide.
+
+Crop Disease & Yield System - Menu
+1. Train Disease Detection Model (CNN)
+2. Train Yield Prediction Model (Random Forest using Dataset)
+3. Test Disease & Yield Prediction and get Recommendation
+4. Exit
+Enter your choice (1-4): 4
+ Exiting program. Goodbye!
+
+
+
+
+
+
+
+
+
+
+Assignment No-1
+
+Title-To develop a machine learning model to build a recommendation system for crop disease
+detection and yield prediction in agriculture.
+
+
+Objectives-
+● To understand the fundamentals of machine learning and its application in agriculture,
+particularly for crop disease detection and yield prediction.
+● To implement a machine learning model that can analyze crop data and make
+predictions about disease presence and expected yield.
+● To evaluate the effectiveness of the model and interpret its predictions in the context of
+agricultural practices.
+
+Outcomes-Students will be able to
+● Grasp key concepts and applications in agriculture, including data handling and
+preprocessing skills.
+● create and select effective features to improve model performance.
+● Experience in training models, assessing performance, and analyzing outputs for
+actionable recommendations.
+● Clear documentation of processes and enhanced problem-solving skills through iterative
+development
+
+
+
+Theory-
+To develop a machine learning model to build a recommendation system for crop disease
+detection and yield prediction in agriculture, follow these steps:
+1. data collection
+you need two types of data:
+● images of crop diseases: images of healthy and diseased crops for disease detection.
+● agricultural/environmental data: data on weather conditions, soil properties, water
+usage, fertilizers, etc., for yield prediction.
+2. data preprocessing
+● image data: prepare images for disease detection using techniques like resizing,
+normalization, and data augmentation.
+● tabular data: clean and preprocess agricultural data (handling missing values, scaling,
+and feature engineering).
+3. machine learning models
+
+● cnn (convolutional neural networks): used for disease detection.
+● regression models (random forest, xgboost, etc.): used for yield prediction based on
+environmental data.
+4. building cnn for disease detection
+● use cnn for image classification to detect diseases in crop images.
+● the cnn architecture typically includes convolutional layers, max pooling, flattening, and
+fully connected layers.
+5. building regression model for yield prediction
+● use regression models to predict crop yield based on environmental factors such as
+rainfall, temperature, soil quality, and fertilizer usage.
+6. training and evaluation
+● train the cnn model for disease detection using labeled image data.
+● train the regression model for yield prediction using the preprocessed tabular data.
+7. recommendation system
+● based on the disease detection and yield prediction results, provide recommendations.
+● if a disease is detected, recommend treatments or preventive measures.
+● if the yield is predicted to be low, suggest changes in farming practices (fertilizers,
+irrigation, etc.).
+8. deployment
+● deploy the trained models as part of a web or mobile application to allow farmers to
+upload images and input data for real-time recommendations.
+Sample code-
+import numpy as np
+import pandas as pd
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import train_test_split
+from keras.models import Sequential
+from keras.layers import Conv2D, MaxPooling2D, Flatten, Dense
+from keras.preprocessing.image import img_to_array
+import random
+# Step 1: Simple CNN for Crop Disease Detection (Using random data for now)
+# ---------------------------------------
+
+# Generate random image data for CNN training (100 images, size 64x64, 3 channels for RGB)
+X_train_images = np.random.rand(100, 64, 64, 3) # Random 100 RGB images
+y_train_images = np.random.randint(2, size=100) # Random binary labels (0: Healthy, 1:
+Diseased)
+# CNN Model for Disease Detection
+cnn_model = Sequential()
+cnn_model.add(Conv2D(32, (3, 3), input_shape=(64, 64, 3), activation=&#39;relu&#39;))
+cnn_model.add(MaxPooling2D(pool_size=(2, 2)))
+cnn_model.add(Flatten())
+cnn_model.add(Dense(128, activation=&#39;relu&#39;))
+cnn_model.add(Dense(1, activation=&#39;sigmoid&#39;)) # Output layer for binary classification
+# Compile the CNN model
+cnn_model.compile(optimizer=&#39;adam&#39;, loss=&#39;binary_crossentropy&#39;, metrics=[&#39;accuracy&#39;])
+# Train the CNN model (using mock data, real images should be used in practice)
+cnn_model.fit(X_train_images, y_train_images, epochs=5, batch_size=10, verbose=1)
+# Step 2: Random Forest for Yield Prediction (Using random environmental data)
+# ---------------------------------------
+# Create mock environmental data (rainfall, temperature, soil_quality) and yield
+X = np.random.rand(100, 3) # Features: rainfall, temperature, soil_quality
+y = np.random.rand(100) * 100 # Yield (arbitrary units, e.g., tons/hectare)
+# Train-test split
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+# Random Forest Model for Yield Prediction
+yield_model = RandomForestRegressor(n_estimators=100, random_state=42)
+yield_model.fit(X_train, y_train)
+# Step 3: Simple Recommendation System
+# ---------------------------------------
+def recommend(disease_prediction, yield_prediction):
+if disease_prediction &gt;= 0.5:
+return &quot;Disease detected! Recommended action: Apply pesticide.&quot;
+elif yield_prediction &lt; 50:
+return &quot;Low yield predicted! Recommended action: Improve irrigation and soil quality.&quot;
+else:
+return &quot;Crop is healthy and yield prediction is optimal.&quot;
+
+# Step 4: Testing with Simulated Input Data
+# ---------------------------------------
+# Simulate a new test image (Replace with actual image data in practice)
+test_image = np.random.rand(1, 64, 64, 3) # A new test image
+disease_prediction = cnn_model.predict(test_image)[0][0] # Predict if the crop is diseased
+# Simulate new environmental data for yield prediction (rainfall, temperature, soil quality)
+test_env_data = np.array([[0.8, 0.6, 0.7]]) # Simulated new data
+yield_prediction = yield_model.predict(test_env_data)[0] # Predict the yield
+# Get recommendation based on predictions
+recommendation = recommend(disease_prediction, yield_prediction)
+# Step 5: Display Output
+# ---------------------------------------
+print(f&quot;Disease Prediction: {disease_prediction:.4f} (0: Healthy, 1: Diseased)&quot;)
+print(f&quot;Yield Prediction: {yield_prediction:.2f} units&quot;)
+print(f&quot;Recommendation: {recommendation}&quot;)
+Output-
+Disease Prediction: 0.3456 (0: Healthy, 1: Diseased)
+Yield Prediction: 72.34 units
+Recommendation: Crop is healthy and yield prediction is optimal.
+

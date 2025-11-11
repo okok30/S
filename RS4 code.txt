@@ -1,0 +1,312 @@
+# ===========================================================
+# 🎗️ BREAST CANCER PROGNOSIS PREDICTION SYSTEM
+# Dataset: RS-A4_SEER Breast Cancer Dataset.csv
+# ===========================================================
+
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+
+# ---------------------------
+# Step 1: Load and preprocess dataset
+# ---------------------------
+def load_dataset():
+    file_path = "RS-A4_SEER Breast Cancer Dataset .csv"
+    df = pd.read_csv(file_path)
+
+    print("✅ Dataset loaded successfully!")
+    print("Columns available:\n", df.columns.tolist()[:15], "...\n")
+
+    # Drop unnamed or empty columns
+    df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
+    df = df.dropna()
+
+    # Encode string/object columns
+    le = LabelEncoder()
+    for col in df.columns:
+        if df[col].dtype == 'object':
+            df[col] = le.fit_transform(df[col])
+
+    # Detect target variable
+    possible_targets = ['Survival_Status', 'Status', 'Outcome']
+    target_col = None
+    for col in possible_targets:
+        if col in df.columns:
+            target_col = col
+            break
+
+    if not target_col:
+        raise ValueError("❌ No suitable target column found. Ensure 'Survival_Status' or similar exists.")
+
+    print(f"Target variable assumed as: {target_col}\n")
+
+    X = df.drop(columns=[target_col])
+    y = df[target_col]
+    return X, y, df.columns
+
+# ---------------------------
+# Step 2: Split data
+# ---------------------------
+def split_data(X, y):
+    return train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+
+# ---------------------------
+# Step 3: Train Model
+# ---------------------------
+def train_model(X_train, y_train):
+    model = RandomForestClassifier(
+        n_estimators=200,
+        max_depth=10,
+        random_state=42,
+        class_weight="balanced"
+    )
+    model.fit(X_train, y_train)
+    return model
+
+# ---------------------------
+# Step 4: Evaluate Model
+# ---------------------------
+def evaluate_model(model, X_test, y_test):
+    y_pred = model.predict(X_test)
+    accuracy = accuracy_score(y_test, y_pred)
+    print(f"🎯 Model Accuracy: {accuracy:.4f}\n")
+    print("Classification Report:\n", classification_report(y_test, y_pred))
+    print("Confusion Matrix:\n", confusion_matrix(y_test, y_pred))
+    return accuracy
+
+# ---------------------------
+# Step 5: Prognosis prediction (interactive)
+# ---------------------------
+def prognosis_prediction(model, X):
+    print("\nEnter patient details for prognosis prediction (or type 'exit' to quit):")
+    while True:
+        proceed = input("Proceed? (yes/exit): ").strip().lower()
+        if proceed == "exit":
+            print("👋 Exiting program.")
+            break
+        elif proceed == "yes":
+            print("Please enter patient features:")
+            input_data = []
+            for col in X.columns:
+                value = input(f"{col}: ")
+                try:
+                    input_data.append(float(value))
+                except:
+                    input_data.append(0)  # fallback for missing or invalid entries
+            pred = model.predict([input_data])[0]
+            if pred == 0:
+                print("Prognosis Recommendation: ✅ Benign results. Routine monitoring suggested, but follow up with a healthcare provider.\n")
+            else:
+                print("Prognosis Recommendation: ⚠️ Malignant risk detected. Immediate medical attention recommended.\n")
+        else:
+            print("Please type 'yes' to continue or 'exit' to quit.")
+
+# ---------------------------
+# Step 6: Main function
+# ---------------------------
+def main():
+    X, y, columns = load_dataset()
+    X_train, X_test, y_train, y_test = split_data(X, y)
+    model = train_model(X_train, y_train)
+    evaluate_model(model, X_test, y_test)
+    prognosis_prediction(model, X)
+
+# ---------------------------
+# Run program
+# ---------------------------
+if __name__ == "__main__":
+    main()
+
+
+
+
+
+
+
+
+
+output
+
+✅ Dataset loaded successfully!
+Columns available:
+ ['Age', 'Race ', 'Marital Status', 'Unnamed: 3', 'T Stage ', 'N Stage', '6th Stage', 'Grade', 'A Stage', 'Tumor Size', 'Estrogen Status', 'Progesterone Status', 'Regional Node Examined', 'Reginol Node Positive', 'Survival Months'] ...
+
+Target variable assumed as: Status
+
+🎯 Model Accuracy: 0.9043
+
+Classification Report:
+               precision    recall  f1-score   support
+
+           0       0.93      0.96      0.94       682
+           1       0.74      0.57      0.65       123
+
+    accuracy                           0.90       805
+   macro avg       0.84      0.77      0.79       805
+weighted avg       0.90      0.90      0.90       805
+
+Confusion Matrix:
+ [[658  24]
+ [ 53  70]]
+
+Enter patient details for prognosis prediction (or type 'exit' to quit):
+Proceed? (yes/exit): yes
+Please enter patient features:
+Age: 43
+Race : Other (American Indian/AK Native, Asian/Pacific Islander)
+Marital Status: Married (including common law)
+T Stage : T2
+N Stage: N3
+6th Stage: IIIC
+Grade: Moderately differentiated; Grade II
+A Stage: Regional
+Tumor Size: 40
+Estrogen Status: positive
+Progesterone Status: positive
+Regional Node Examined: 19
+Reginol Node Positive: 11
+Survival Months: 1
+C:\aProgramData\anaconda3\Lib\site-packages\sklearn\base.py:464: UserWarning: X does not have valid feature names, but RandomForestClassifier was fitted with feature names
+  warnings.warn(
+Proceed? (yes/exit): 
+Prognosis Recommendation: ⚠️ Malignant risk detected. Immediate medical attention recommended.
+
+
+
+
+
+
+
+
+
+
+
+Assignment No - 4
+
+Title - Develop a Machine learning based Recommendation System for breast cancer prognosis
+Objectives-
+● To develop a machine learning-based recommendation system that assists in breast
+cancer prognosis by analyzing patient data, identifying patterns, and recommending
+potential treatment options or risk assessments.
+● The aim is to improve prognosis accuracy, facilitate early diagnosis, and personalize
+treatment plans based on predictive analytics.
+Outcomes-
+● Students learn to clean and preprocess data, addressing missing values and normalizing
+features.
+● Students gain hands-on experience in building and training machine learning models.
+● Students learn to assess model performance using metrics like accuracy and F1-score.
+● Students apply theoretical
+● concepts from coursework in a practical setting.
+● Students explore how predictions can inform personalized treatment options.
+● Students discuss ethical issues related to data privacy and bias in medical data.
+● Students develop critical thinking and troubleshooting skills throughout the project.
+Theory-
+Breast cancer is one of the most prevalent cancers among women worldwide. Prognosis varies
+significantly based on various factors such as tumor size, grade, lymph node involvement, and
+patient age. Machine learning techniques can analyze complex datasets to identify patterns that
+may not be evident through traditional statistical methods. This project aims to harness these
+techniques to develop a robust prognostic model that can recommend treatment pathways based
+on individual patient profiles.
+Data Collection
+Dataset Selection
+- Source: Use publicly available datasets such as the Breast Cancer Wisconsin (Diagnostic) Data
+Set from the UCI Machine Learning Repository or the METABRIC dataset from cBioPortal.
+- Features: The dataset should include features relevant to breast cancer prognosis, such as:
+- Age
+- Tumor size
+- Tumor grade
+- Hormone receptor status (ER, PR, HER2)
+- Lymph node involvement
+- Genetic markers
+- Patient demographics
+Data Preprocessing
+- Data Cleaning: Handle missing values, remove duplicates, and normalize the data.
+- Feature Selection: Utilize techniques such as correlation analysis and recursive feature
+elimination to select significant features.
+- Data Splitting: Split the dataset into training (70%), validation (15%), and testing (15%)
+subsets.
+Model Development
+Choice of Algorithms
+Select appropriate machine learning algorithms based on the nature of the data and the prediction
+task. Possible algorithms include:
+
+- Logistic Regression: For binary classification (e.g., prognosis: good vs. poor).
+- Decision Trees: To understand feature importance and decision rules.
+- Random Forest: To improve prediction accuracy through ensemble learning.
+- Support Vector Machines (SVM): For classification tasks.
+- Neural Networks: To capture complex patterns in the data.
+Model Training and Evaluation
+- Training: Train the models using the training dataset. Use techniques such as cross-validation
+to optimize hyperparameters.
+- Evaluation Metrics: Evaluate the model performance using metrics like accuracy, precision,
+recall, F1-score, and area under the ROC curve (AUC).
+Implementation of Recommendation System
+Development of the Recommendation Engine
+- Recommendation Logic: Based on the model predictions, design a system that recommends
+treatment plans based on risk stratification. For example:
+- High-risk patients may be recommended more aggressive treatment options.
+- Low-risk patients may be monitored with less intensive treatment.
+User Interface
+- Develop a simple user interface (UI) to input patient data and receive prognostic
+recommendations. This could be a web-based application using Flask or Streamlit.
+Ethical Considerations
+- Patient Privacy: Ensure compliance with ethical standards and regulations (e.g., HIPAA)
+concerning patient data.
+- Bias Mitigation: Assess the model for biases based on demographics and strive to ensure fair
+treatment recommendations across diverse patient populations.
+Conclusion -
+In conclusion, the development of a machine learning-based recommendation system for breast
+cancer prognosis can significantly enhance the decision-making process in clinical settings. By
+utilizing advanced predictive modeling techniques, this system can offer personalized treatment
+recommendations, ultimately leading to improved patient outcomes and quality of care.
+Code-t
+# Step 1: Importing necessary libraries
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+from sklearn.datasets import load_breast_cancer
+import numpy as np
+# Step 2: Loading the Breast Cancer dataset
+data = load_breast_cancer()
+df = pd.DataFrame(data.data, columns=data.feature_names)
+df[&#39;target&#39;] = data.target # target: 0 = malignant, 1 = benign
+
+# Step 3: Data Preprocessing (optional, depending on dataset)
+# In this case, the data is already preprocessed, but further normalization or feature selection may
+be added.
+# Step 4: Splitting the data into train and test sets
+X = df.drop(columns=&#39;target&#39;) # features
+y = df[&#39;target&#39;] # target variable
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+# Step 5: Training the model
+model = RandomForestClassifier(n_estimators=100, random_state=42)
+model.fit(X_train, y_train)
+# Step 6: Predicting and evaluating the model
+y_pred = model.predict(X_test)
+accuracy = accuracy_score(y_test, y_pred)
+print(&quot;Model Accuracy:&quot;, accuracy)
+print(&quot;\nClassification Report:\n&quot;, classification_report(y_test, y_pred))
+print(&quot;Confusion Matrix:\n&quot;, confusion_matrix(y_test, y_pred))
+# Step 7: Making recommendations based on prediction outcomes
+def prognosis_recommendation(features):
+&quot;&quot;&quot;
+Function to provide prognosis recommendation based on model predictions.
+:param features: Array of patient features
+:return: String recommendation
+&quot;&quot;&quot;
+prediction = model.predict([features])
+if prediction[0] == 0:
+return &quot;High risk of malignant cancer. Immediate consultation and further tests
+recommended.&quot;
+else:
+return &quot;Benign results. Routine monitoring suggested, but follow up with a healthcare
+provider.&quot;
+# Example usage
+example_patient = X_test.iloc[0].values # taking one test sample
+recommendation = prognosis_recommendation(example_patient)
+print(&quot;Recommendation:&quot;, recommendation)
+Note- Run the code and get the proper output.
+

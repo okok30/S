@@ -1,0 +1,331 @@
+# ==========================================
+# 🎬 MEMORY-EFFICIENT MOVIE RECOMMENDATION SYSTEM
+# ==========================================
+
+import pandas as pd
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.neighbors import NearestNeighbors
+
+# Step 1: Load Movie Data
+def load_movie_data(file_path):
+    movies_df = pd.read_csv(file_path)
+    print(f"\n✅ Dataset loaded successfully with {len(movies_df)} records.")
+    print(f"Available columns: {list(movies_df.columns)}\n")
+    return movies_df
+
+# Step 2: Preprocess Data
+def preprocess_data(movies_df):
+    possible_genre_cols = ['genres', 'genre', 'Category']
+    possible_desc_cols = ['description', 'overview', 'summary', 'plot', 'storyline']
+
+    genre_col = next((c for c in possible_genre_cols if c in movies_df.columns), None)
+    desc_col = next((c for c in possible_desc_cols if c in movies_df.columns), None)
+
+    if genre_col and desc_col:
+        movies_df['content'] = movies_df[genre_col].fillna('') + ' ' + movies_df[desc_col].fillna('')
+    elif genre_col:
+        movies_df['content'] = movies_df[genre_col].fillna('')
+    elif desc_col:
+        movies_df['content'] = movies_df[desc_col].fillna('')
+    else:
+        raise KeyError("❌ No suitable text column (genre/description) found in dataset!")
+
+    return movies_df
+
+# Step 3: Create TF-IDF Matrix
+def create_tfidf_matrix(movies_df):
+    tfidf = TfidfVectorizer(stop_words='english', max_features=5000)
+    tfidf_matrix = tfidf.fit_transform(movies_df['content'])
+    print(f"✅ TF-IDF matrix created with shape {tfidf_matrix.shape}")
+    return tfidf_matrix
+
+# Step 4: Fit Nearest Neighbors Model
+def build_knn_model(tfidf_matrix):
+    model = NearestNeighbors(metric='cosine', algorithm='brute')
+    model.fit(tfidf_matrix)
+    return model
+
+# Step 5: Get Recommendations
+def get_recommendations(title, movies_df, tfidf_matrix, model, top_n=3):
+    if title not in movies_df['title'].values:
+        print(f"❌ Movie '{title}' not found in dataset.")
+        return pd.Series(dtype=str)
+
+    idx = movies_df.index[movies_df['title'] == title][0]
+    movie_vec = tfidf_matrix[idx]
+    distances, indices = model.kneighbors(movie_vec, n_neighbors=top_n+1)
+    rec_indices = indices.flatten()[1:]  # skip itself
+    return movies_df['title'].iloc[rec_indices]
+
+# Step 6: Menu
+def main_menu():
+    file_path = "RS-A2_A3_movie.csv"  # ✅ your dataset
+    movies_df = None
+    tfidf_matrix = None
+    model = None
+
+    while True:
+        print("\n🎥 Movie Recommendation System")
+        print("1. Load Movie Dataset")
+        print("2. Preprocess and Build Model")
+        print("3. Get Movie Recommendations")
+        print("4. Exit")
+
+        choice = input("Enter choice (1-4): ")
+
+        if choice == '1':
+            movies_df = load_movie_data(file_path)
+            if 'title' not in movies_df.columns:
+                raise KeyError("❌ Dataset must have a 'title' column.")
+            print("Movies loaded successfully.")
+
+        elif choice == '2':
+            if movies_df is None:
+                print("⚠️ Please load the dataset first (option 1).")
+                continue
+            movies_df = preprocess_data(movies_df)
+            tfidf_matrix = create_tfidf_matrix(movies_df)
+            model = build_knn_model(tfidf_matrix)
+            print("✅ Model built and ready for recommendations.")
+
+        elif choice == '3':
+            if movies_df is None or model is None:
+                print("⚠️ Please load data and build model first (options 1 and 2).")
+                continue
+            movie_title = input("Enter movie title from dataset: ")
+            recs = get_recommendations(movie_title, movies_df, tfidf_matrix, model, top_n=3)
+            if not recs.empty:
+                print(f"\n🎬 Top recommendations for '{movie_title}':")
+                for r in recs:
+                    print(f" - {r}")
+            else:
+                print("No recommendations found.")
+
+        elif choice == '4':
+            print("👋 Goodbye!")
+            break
+        else:
+            print("❌ Invalid choice. Please enter 1–4.")
+
+# Step 7: Run
+if __name__ == "__main__":
+    main_menu()
+
+
+
+
+
+
+
+
+output:
+
+🎥 Movie Recommendation System
+1. Load Movie Dataset
+2. Preprocess and Build Model
+3. Get Movie Recommendations
+4. Exit
+Enter choice (1-4): 1
+
+✅ Dataset loaded successfully with 27278 records.
+Available columns: ['movieId', 'title', 'genres']
+
+Movies loaded successfully.
+
+🎥 Movie Recommendation System
+1. Load Movie Dataset
+2. Preprocess and Build Model
+3. Get Movie Recommendations
+4. Exit
+Enter choice (1-4): 2
+✅ TF-IDF matrix created with shape (27278, 23)
+✅ Model built and ready for recommendations.
+
+🎥 Movie Recommendation System
+1. Load Movie Dataset
+2. Preprocess and Build Model
+3. Get Movie Recommendations
+4. Exit
+Enter choice (1-4): 3
+Enter movie title from dataset: Grumpier Old Men (1995)
+
+🎬 Top recommendations for 'Grumpier Old Men (1995)':
+ - Show People (1928)
+ - Western (1997)
+ - Mr. Deeds (2002)
+
+🎥 Movie Recommendation System
+1. Load Movie Dataset
+2. Preprocess and Build Model
+3. Get Movie Recommendations
+4. Exit
+Enter choice (1-4): 3
+Enter movie title from dataset: Sudden Death (1995)
+
+🎬 Top recommendations for 'Sudden Death (1995)':
+ - Soldier, The (1982)
+ - 3 Little Ninjas and the Lost Treasure (1990)
+ - Extraction (2013)
+
+🎥 Movie Recommendation System
+1. Load Movie Dataset
+2. Preprocess and Build Model
+3. Get Movie Recommendations
+4. Exit
+
+
+
+
+
+Assignment No-2
+
+Title-Produce and evaluate content based movie recommendation system.
+Objectives-
+● To understand the principles of content-based filtering in recommendation systems. ●
+To implement a content-based movie recommendation system using movie features
+(e.g., genres, descriptions).
+● To evaluate the effectiveness of the recommendation system using appropriate metrics.
+Outcomes-Students will be able
+● Understand and apply the principles of content-based filtering in recommendation
+systems.
+● Demonstrate proficiency in data preprocessing and feature extraction techniques.
+● Implement a functional content-based movie recommendation system in Python. ●
+Evaluate the recommendation system using relevant metrics and analyze its
+performance.
+● Document the entire process, including methodology, results, and conclusions, in a clear
+and professional manner.
+
+Theory
+A content-based movie recommendation system suggests movies to users based on the
+characteristics of the movies they have liked in the past. This approach analyzes the attributes
+of movies, such as genre, description, and other relevant features, to find similar movies that
+match the user’s preferences.
+Key Components
+1. Dataset:
+○ A dataset containing movie details is essential. Common attributes include:
+■ Title: The name of the movie.
+■ Genres: The categories or genres the movie falls under (e.g., Action,
+Drama).
+■ Description: A brief summary of the movie&#39;s plot.
+
+2. Preprocessing:
+○ Combine relevant features to create a content profile for each movie. This often
+involves concatenating the genres and descriptions into a single string, which
+represents the movie&#39;s content.
+
+3. Feature Extraction:
+○ Use techniques like TF-IDF (Term Frequency-Inverse Document Frequency) to
+convert text data into numerical format. TF-IDF helps in understanding the
+importance of words in the context of the entire dataset.
+○ It assigns weights to words based on their frequency in a particular document
+compared to their frequency across all documents.
+
+4. Similarity Calculation:
+○ Cosine Similarity is commonly used to measure the similarity between movies. It
+calculates the cosine of the angle between two vectors (the TF-IDF
+representations of two movies). A smaller angle indicates more
+
+similarity. 5. Recommendation Generation:
+○ For a given movie, the system finds other movies with high similarity scores. The
+top N movies with the highest similarity scores are recommended to the user.
+
+Implementation Steps
+1. Load the Dataset
+You can use a structured dataset, such as one from MovieLens or IMDB, or create a sample
+dataset.
+2. Preprocess the Data
+Combine relevant attributes (like genres and descriptions) into a single string for each movie.
+3. Create the TF-IDF Matrix
+Use a TF-IDF vectorizer to transform the text data into a matrix form, where each row
+represents a movie, and each column represents a word from the dataset.
+4. Compute Cosine Similarity
+Calculate the cosine similarity matrix from the TF-IDF matrix to find how similar each movie is to
+the others.
+5. Build the Recommendation Function
+Create a function that:
+● Takes a movie title as input.
+● Finds the index of that movie in the dataset.
+● Retrieves the similarity scores for that movie.
+● Sorts the scores and selects the top N movies to recommend.
+Sample code-
+# Importing Required Libraries
+import pandas as pd
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import linear_kernel
+
+# Step 1: Load Movie Dataset
+# Creating a simple movie dataset for demonstration
+data = {
+&#39;title&#39;: [
+
+&#39;The Shawshank Redemption&#39;,
+&#39;The Godfather&#39;,
+&#39;The Dark Knight&#39;,
+&#39;Pulp Fiction&#39;,
+&#39;The Lord of the Rings: The Return of the King&#39;
+],
+&#39;genres&#39;: [
+&#39;Drama&#39;,
+&#39;Crime, Drama&#39;,
+&#39;Action, Crime, Drama&#39;,
+&#39;Crime, Drama&#39;,
+&#39;Action, Adventure, Fantasy&#39;
+],
+&#39;description&#39;: [
+&#39;Two imprisoned men bond over a number of years, finding solace and
+eventual redemption through acts of common decency.&#39;,
+&#39;The aging patriarch of an organized crime dynasty transfers control of his reluctant
+son.&#39;,
+&#39;When the menace known as the Joker emerges, he wreaks havoc and chaos on
+Gotham.&#39;,
+&#39;The lives of two mob hitmen, a boxer, a gangster\&#39;s wife, and diner bandits
+intertwine in tales of violence and redemption.&#39;,
+&#39;Gandalf and Aragorn lead the World of Men against Sauron\&#39;s army to save
+Middle-earth.&#39;
+]
+}
+
+movies_df = pd.DataFrame(data)
+
+# Step 2: Preprocess the Data
+
+# Combine genres and description into a single string for each movie
+movies_df[&#39;content&#39;] = movies_df[&#39;genres&#39;] + &#39; &#39; + movies_df[&#39;description&#39;]
+
+# Step 3: Create a TF-IDF Vectorizer and Compute the Similarity Matrix
+tfidf = TfidfVectorizer(stop_words=&#39;english&#39;)
+tfidf_matrix = tfidf.fit_transform(movies_df[&#39;content&#39;])
+
+# Compute the cosine similarity matrix
+cosine_sim = linear_kernel(tfidf_matrix, tfidf_matrix)
+
+# Step 4: Build Recommendation Function
+def get_recommendations(title, cosine_sim=cosine_sim):
+# Get the index of the movie that matches the title
+idx = movies_df.index[movies_df[&#39;title&#39;] == title][0]
+# Get the pairwise similarity scores of all movies with that movie
+sim_scores = list(enumerate(cosine_sim[idx]))
+
+# Sort the movies based on the similarity scores
+sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
+
+# Get the scores of the 3 most similar movies
+sim_scores = sim_scores[1:4]
+
+# Get the movie indices
+movie_indices = [i[0] for i in sim_scores]
+
+# Return the top 3 most similar movies
+return movies_df[&#39;title&#39;].iloc[movie_indices]
+
+# Step 5: Test the Recommendation System
+# Example: Get recommendations for &#39;The Godfather&#39;
+recommended_movies = get_recommendations(&#39;The Godfather&#39;)
+print(&quot;Recommendations for &#39;The Godfather&#39;:&quot;)
+print(recommended_movies)
+
+Output
+Recommendations for &#39;The Godfather&#39;:
+0 The Shawshank Redemption
+3 Pulp Fiction
+4 The Lord of the Rings: The Return of the King
